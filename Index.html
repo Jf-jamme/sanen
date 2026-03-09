@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>三门问题</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+</head>
+<body style="margin:0;padding:0;">
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useCallback } = React;
+const DOORS = [0, 1, 2];
+const DOOR_LABELS = ["A", "B", "C"];
+
+function pickRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function StatCard({ label, wins, total, rate, accent }) {
+  return (
+    <div style={{
+      border: "1px solid #1e1e2e", borderRadius: "6px",
+      padding: "1rem", textAlign: "center", background: "#0d0d18",
+    }}>
+      <div style={{ fontSize: "0.65rem", letterSpacing: "0.15em", color: "#5a5a70", marginBottom: "0.5rem", textTransform: "uppercase" }}>{label}</div>
+      <div style={{ fontSize: "1.6rem", fontWeight: "bold", color: accent, marginBottom: "0.2rem" }}>
+        {rate}{rate !== "—" ? "%" : ""}
+      </div>
+      <div style={{ fontSize: "0.7rem", color: "#3a3a5a" }}>{wins} / {total} 轮</div>
+    </div>
+  );
+}
+
+function btnStyle(bg, color, border) {
+  return {
+    background: bg, color: color,
+    border: `1px solid ${border || bg}`,
+    borderRadius: "4px", padding: "0.6rem 1.8rem",
+    fontSize: "0.85rem", letterSpacing: "0.12em",
+    cursor: "pointer", fontFamily: "inherit",
+  };
+}
+
+function App() {
+  const [prizeDoor, setPrizeDoor] = useState(() => Math.floor(Math.random() * 3));
+  const [playerChoice, setPlayerChoice] = useState(null);
+  const [revealedDoor, setRevealedDoor] = useState(null);
+  const [finalChoice, setFinalChoice] = useState(null);
+  const [result, setResult] = useState(null);
+  const [phase, setPhase] = useState("pick");
+  const [history, setHistory] = useState([]);
+  const [showPrize, setShowPrize] = useState(false);
+
+  const stats = {
+    total: history.length,
+    switchWins: history.filter(h => h.switched && h.won).length,
+    switchTotal: history.filter(h => h.switched).length,
+    stayWins: history.filter(h => !h.switched && h.won).length,
+    stayTotal: history.filter(h => !h.switched).length,
+  };
+
+  const handlePick = useCallback((door) => {
+    setPlayerChoice(door);
+    const candidates = DOORS.filter(d => d !== door && d !== prizeDoor);
+    const reveal = pickRandom(candidates);
+    setRevealedDoor(reveal);
+    setPhase("switch");
+    setShowPrize(false);
+  }, [prizeDoor]);
+
+  const handleDecision = useCallback((doSwitch) => {
+    let chosen;
+    if (doSwitch) {
+      chosen = DOORS.find(d => d !== playerChoice && d !== revealedDoor);
+    } else {
+      chosen = playerChoice;
+    }
+    const won = chosen === prizeDoor;
+    setFinalChoice(chosen);
+    setResult(won ? "win" : "lose");
+    setPhase("done");
+    setShowPrize(true);
+    setHistory(prev => [...prev, { switched: doSwitch, won }]);
+  }, [playerChoice, revealedDoor, prizeDoor]);
+
+  const nextRound = useCallback(() => {
+    const newPrize = Math.floor(Math.random() * 3);
+    setPrizeDoor(newPrize);
+    setPlayerChoice(null);
+    setRevealedDoor(null);
+    setFinalChoice(null);
+    setResult(null);
+    setPhase("pick");
+    setShowPrize(false);
+  }, []);
+
+  const reset = () => { setHistory([]); nextRound(); };
+
+  const switchRate = stats.switchTotal > 0 ? (stats.switchWins / stats.switchTotal * 100).toFixed(1) : "—";
+  const stayRate = stats.stayTotal > 0 ? (stats.stayWins / stats.stayTotal * 100).toFixed(1) : "—";
+
+  return (
+    <div style={{
+      minHeight: "100vh", background: "#0a0a0f", color: "#e8e4d9",
+      fontFamily: "'Georgia', 'Times New Roman', serif",
+      display: "flex", flexDirection: "column", alignItems: "center", padding: "2rem 1rem",
+    }}>
+      <div style={{ textAlign: "center", marginBottom: "2.5rem" }}>
+        <div style={{ fontSize: "0.65rem", letterSpacing: "0.2em", color: "#4a4a5a", marginBottom: "0.8rem" }}>
+          by 跃思教育 JumpMindEducation
+        </div>
+        <div style={{ fontSize: "0.7rem", letterSpacing: "0.3em", color: "#6b6b7a", textTransform: "uppercase", marginBottom: "0.5rem" }}>概率论演示</div>
+        <h1 style={{ fontSize: "2rem", fontWeight: "normal", margin: 0, letterSpacing: "0.05em", color: "#e8e4d9" }}>三门问题</h1>
+        <div style={{ width: "40px", height: "1px", background: "#c9a84c", margin: "0.8rem auto 0" }} />
+      </div>
+
+      <div style={{ fontSize: "0.85rem", letterSpacing: "0.08em", color: "#9d9aaa", marginBottom: "2rem", minHeight: "1.4em", textAlign: "center" }}>
+        {phase === "pick" && "选择你认为有奖品的一扇门"}
+        {phase === "switch" && `主持人打开了 ${DOOR_LABELS[revealedDoor]} 门，后面没有奖品。你要换门吗？`}
+        {phase === "done" && (result === "win" ? "🎉 恭喜，猜中了！" : "很遗憾，没有奖品。")}
+      </div>
+
+      <div style={{ display: "flex", gap: "1.5rem", marginBottom: "2.5rem" }}>
+        {DOORS.map(door => {
+          const isRevealed = door === revealedDoor;
+          const isFinal = door === finalChoice;
+          const isPrize = door === prizeDoor;
+          const isPlayer = door === playerChoice;
+          const isClickable = phase === "pick";
+          let borderColor = "#2a2a3a";
+          if (isPlayer && phase === "switch") borderColor = "#c9a84c";
+          if (isFinal && phase === "done") borderColor = result === "win" ? "#5db87a" : "#c0473f";
+          if (isRevealed) borderColor = "#2a2a3a";
+          return (
+            <div key={door} onClick={() => isClickable ? handlePick(door) : null}
+              style={{
+                width: "90px", height: "140px", border: `2px solid ${borderColor}`,
+                borderRadius: "6px", display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center",
+                cursor: isClickable ? "pointer" : "default",
+                transition: "all 0.25s ease",
+                background: isRevealed ? "#111118" : "#13131f",
+                opacity: isRevealed ? 0.4 : 1,
+                position: "relative", userSelect: "none",
+              }}>
+              <div style={{ fontSize: "1.6rem", marginBottom: "0.3rem" }}>
+                {showPrize && isPrize ? "🏆" : isRevealed ? "🐐" : "🚪"}
+              </div>
+              <div style={{ fontSize: "0.75rem", letterSpacing: "0.15em", color: "#5a5a70" }}>{DOOR_LABELS[door]}</div>
+              {isPlayer && phase === "switch" && (
+                <div style={{ position: "absolute", bottom: "-22px", fontSize: "0.6rem", color: "#c9a84c", letterSpacing: "0.1em" }}>你的选择</div>
+              )}
+              {isFinal && phase === "done" && (
+                <div style={{ position: "absolute", bottom: "-22px", fontSize: "0.6rem", color: result === "win" ? "#5db87a" : "#c0473f", letterSpacing: "0.1em" }}>最终选择</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {phase === "switch" && (
+        <div style={{ display: "flex", gap: "1rem", marginTop: "1rem", marginBottom: "2.5rem" }}>
+          <button onClick={() => handleDecision(true)} style={btnStyle("#c9a84c", "#0a0a0f")}>换门</button>
+          <button onClick={() => handleDecision(false)} style={btnStyle("transparent", "#9d9aaa", "#3a3a4a")}>不换</button>
+        </div>
+      )}
+
+      {phase === "done" && (
+        <div style={{ marginBottom: "2.5rem" }}>
+          <button onClick={nextRound} style={btnStyle("#c9a84c", "#0a0a0f")}>下一轮</button>
+        </div>
+      )}
+
+      {stats.total > 0 && (
+        <div style={{ width: "100%", maxWidth: "420px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.5rem" }}>
+            <div style={{ flex: 1, height: "1px", background: "#1e1e2e" }} />
+            <div style={{ fontSize: "0.65rem", letterSpacing: "0.25em", color: "#3a3a5a", textTransform: "uppercase" }}>统计</div>
+            <div style={{ flex: 1, height: "1px", background: "#1e1e2e" }} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
+            <StatCard label="换门策略" wins={stats.switchWins} total={stats.switchTotal} rate={switchRate} accent="#c9a84c" />
+            <StatCard label="不换策略" wins={stats.stayWins} total={stats.stayTotal} rate={stayRate} accent="#6b8cba" />
+          </div>
+          <div style={{ textAlign: "center", marginBottom: "1rem" }}>
+            <span style={{ fontSize: "0.7rem", color: "#3a3a5a", letterSpacing: "0.1em" }}>共 {stats.total} 轮</span>
+            {stats.total >= 5 && (
+              <span style={{ fontSize: "0.7rem", color: "#5a5a70", marginLeft: "1rem" }}>理论值：换门 ≈ 66.7%　不换 ≈ 33.3%</span>
+            )}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", justifyContent: "center", marginBottom: "1.5rem" }}>
+            {history.map((h, i) => (
+              <div key={i} title={`第${i+1}轮：${h.switched ? "换" : "不换"}，${h.won ? "赢" : "输"}`}
+                style={{ width: "10px", height: "10px", borderRadius: "2px", background: h.won ? (h.switched ? "#c9a84c" : "#6b8cba") : "#2a2a3a", opacity: h.won ? 1 : 0.5 }} />
+            ))}
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <button onClick={reset} style={{ background: "none", border: "none", color: "#3a3a5a", fontSize: "0.7rem", cursor: "pointer", letterSpacing: "0.15em", textDecoration: "underline" }}>
+              清空记录
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
